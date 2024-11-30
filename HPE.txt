@@ -1,0 +1,1348 @@
+# install ultralytic
+!pip3 install git+https://github.com/ultralytics/ultralytics.git
+!pip3 install kaggle opendatasets
+-----------------------------------------
+# Download kaggle dataset
+import opendatasets as od
+
+od.download(
+   'https://www.kaggle.com/datasets/niharika41298/yoga-poses-dataset?resource=download'
+)
+
+---------------------------------------------------------------------------
+!ls /content/yoga-poses-dataset/DATASET/TRAIN
+-----------------------------------------------------
+import cv2
+from PIL import Image
+from pydantic import BaseModel
+
+import ultralytics
+------------------------------------------------------------------
+model = ultralytics.YOLO(model='yolov8m-pose.pt')
+-------------------------------------------------------------------------
+image = cv2.imread('/content/yoga-poses-dataset/DATASET/TRAIN/downdog/00000128.jpg')
+result = model.predict(image, save=False)[0]
+result_keypoint = result.keypoints.xyn.cpu().numpy()[0]
+result.boxes.xyxy
+
+---------------------------------------------
+
+result.keypoints[0]
+-----------------------------------------
+Image.fromarray(cv2.cvtColor(result.plot(), cv2.COLOR_BGR2RGB))
+-------------------------------------------------------------------------
+class GetKeypoint(BaseModel):
+    NOSE:           int = 0
+    LEFT_EYE:       int = 1
+    RIGHT_EYE:      int = 2
+    LEFT_EAR:       int = 3
+    RIGHT_EAR:      int = 4
+    LEFT_SHOULDER:  int = 5
+    RIGHT_SHOULDER: int = 6
+    LEFT_ELBOW:     int = 7
+    RIGHT_ELBOW:    int = 8
+    LEFT_WRIST:     int = 9
+    RIGHT_WRIST:    int = 10
+    LEFT_HIP:       int = 11
+    RIGHT_HIP:      int = 12
+    LEFT_KNEE:      int = 13
+    RIGHT_KNEE:     int = 14
+    LEFT_ANKLE:     int = 15
+    RIGHT_ANKLE:    int = 16
+
+get_keypoint = GetKeypoint()
+-------------------------------------------------------------------------------
+import os
+import glob
+--------------------------------------------------------------
+dataset_root = '/content/yoga-poses-dataset/DATASET/TRAIN'
+pose_list = os.listdir(dataset_root)
+pose_list
+-----------------------------------------------------------------------
+def extract_keypoint(keypoint):
+    # nose
+    nose_x, nose_y = keypoint[get_keypoint.NOSE]
+    # eye
+    left_eye_x, left_eye_y = keypoint[get_keypoint.LEFT_EYE]
+    right_eye_x, right_eye_y = keypoint[get_keypoint.RIGHT_EYE]
+    # ear
+    left_ear_x, left_ear_y = keypoint[get_keypoint.LEFT_EAR]
+    right_ear_x, right_ear_y = keypoint[get_keypoint.RIGHT_EAR]
+    # shoulder
+    left_shoulder_x, left_shoulder_y = keypoint[get_keypoint.LEFT_SHOULDER]
+    right_shoulder_x, right_shoulder_y = keypoint[get_keypoint.RIGHT_SHOULDER]
+    # elbow
+    left_elbow_x, left_elbow_y = keypoint[get_keypoint.LEFT_ELBOW]
+    right_elbow_x, right_elbow_y = keypoint[get_keypoint.RIGHT_ELBOW]
+    # wrist
+    left_wrist_x, left_wrist_y = keypoint[get_keypoint.LEFT_WRIST]
+    right_wrist_x, right_wrist_y = keypoint[get_keypoint.RIGHT_WRIST]
+    # hip
+    left_hip_x, left_hip_y = keypoint[get_keypoint.LEFT_HIP]
+    right_hip_x, right_hip_y = keypoint[get_keypoint.RIGHT_HIP]
+    # knee
+    left_knee_x, left_knee_y = keypoint[get_keypoint.LEFT_KNEE]
+    right_knee_x, right_knee_y = keypoint[get_keypoint.RIGHT_KNEE]
+    # ankle
+    left_ankle_x, left_ankle_y = keypoint[get_keypoint.LEFT_ANKLE]
+    right_ankle_x, right_ankle_y = keypoint[get_keypoint.RIGHT_ANKLE]
+    return [
+        nose_x, nose_y,
+        left_eye_x, left_eye_y,
+        right_eye_x, right_eye_y,
+        left_ear_x, left_ear_y,
+        right_ear_x, right_ear_y,
+        left_shoulder_x, left_shoulder_y,
+        right_shoulder_x, right_shoulder_y,
+        left_elbow_x, left_elbow_y,
+        right_elbow_x, right_elbow_y,
+        left_wrist_x, left_wrist_y,
+        right_wrist_x, right_wrist_y,
+        left_hip_x, left_hip_y,
+        right_hip_x, right_hip_y,
+        left_knee_x, left_knee_y,
+        right_knee_x, right_knee_y,
+        left_ankle_x, left_ankle_y,
+        right_ankle_x, right_ankle_y
+    ]
+
+---------------------------------------------------------------------------------
+dataset_csv = []
+for pose in pose_list:
+    image_path_list = glob.glob(f'{dataset_root}/{pose}/*.jpg')
+    for image_path in image_path_list:
+        # get image_name
+        image_name = image_path.split('/')[-1]
+        # read numpy image
+        image = cv2.imread(image_path)
+        # get height width image
+        height, width = image.shape[:2]
+
+        # detect pose using yolov8-pose
+        results = model.predict(image, save=False)[0]
+        results_keypoint = results.keypoints.xyn.cpu().numpy()
+        for result_keypoint in results_keypoint:
+            if len(result_keypoint) == 17:
+                keypoint_list = extract_keypoint(result_keypoint)
+
+                # inset image_name, labe] in index 0,1
+                keypoint_list.insert(0, image_name)
+                keypoint_list.insert(1, pose)
+                dataset_csv.append(keypoint_list)
+        # break
+    # break
+---------------------------------------------------------------------------------
+import csv
+# write csv
+header = [
+    'image_name',
+    'label',
+    # nose
+    'nose_x',
+    'nose_y',
+    # left eye
+    'left_eye_x',
+    'left_eye_y',
+    # right eye
+    'right_eye_x',
+    'right_eye_y',
+    # left ear
+    'left_ear_x',
+    'left_ear_y',
+    # right ear
+    'right_ear_x',
+    'right_ear_y',
+    # left shoulder
+    'left_shoulder_x',
+    'left_shoulder_y',
+    # right sholder
+    'right_shoulder_x',
+    'right_shoulder_y',
+     # left elbow
+    'left_elbow_x',
+    'left_elbow_y',
+    # rigth elbow
+    'right_elbow_x',
+    'right_elbow_y',
+    # left wrist
+    'left_wrist_x',
+    'left_wrist_y',
+    # right wrist
+    'right_wrist_x',
+    'right_wrist_y',
+    # left hip
+    'left_hip_x',
+    'left_hip_y',
+    # right hip
+    'right_hip_x',
+    'right_hip_y',
+    # left knee
+    'left_knee_x',
+    'left_knee_y',
+    # right knee
+    'right_knee_x',
+    'right_knee_y',
+    # left ankle
+    'left_ankle_x',
+    'left_ankle_y',
+    # right ankle
+    'right_ankle_x',
+    'right_ankle_y'
+]
+
+with open('yoga_pose_keypoint.csv', 'w', encoding='UTF8', newline='') as f:
+    writer = csv.writer(f)
+
+    # write the header
+    writer.writerow(header)
+
+    # write multiple rows
+    writer.writerows(dataset_csv)
+---------------------------------------------------------------------------------
+import pandas as pd
+
+df = pd.read_csv('yoga_pose_keypoint.csv')
+df = df.drop('image_name', axis=1)
+df.head()
+-------------------------------------------------------------------------------
+import numpy as np
+import pandas as pd
+from tqdm import tqdm
+import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler
+from sklearn.utils.class_weight import compute_class_weight
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix
+
+import torch
+from torch import nn
+from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+---------------------------------------------------------------------------------
+df = pd.read_csv('/content/yoga_pose_keypoint.csv')
+df.head()
+------------------------------------------------------------
+df.info()
+-----------------------------------------------------
+df.label.value_counts().plot(kind="bar")
+plt.xticks(rotation=45)
+plt.show()
+-------------------------------------------------------------------
+# encoder label
+encoder = LabelEncoder()
+y_label = df['label']
+y = encoder.fit_transform(y_label)
+y
+------------------------------------------------------------------------
+class_weights = compute_class_weight(class_weight='balanced', classes=np.unique(y), y=y)
+class_weights
+--------------------------------------------------------------------------------
+# Get keypoint dataset
+X = df.iloc[:,12:]
+X
+-------------------------------------------------------------------------------
+# train test split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, shuffle=True, random_state=2022)
+
+print("Number of Training keypoints: ", len(X_train))
+print("Number of Testing keypoints: ", len(X_test))
+--------------------------------------------------------------------------------
+scaler = MinMaxScaler()
+-----------------------------------------------------------------------------
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+X_test
+------------------------------------------------------------------------------
+class DataKeypointClassification(Dataset):
+    def __init__(self, X, y):
+        self.x = torch.from_numpy(X.astype(np.float32))
+        self.y = torch.from_numpy(y.astype(np.int64))
+        self.n_samples = X.shape[0]
+
+    def __getitem__(self, index):
+        return self.x[index], self.y[index]
+
+    def __len__(self):
+        return self.n_samples
+------------------------------------------------------------------------------
+train_dataset = DataKeypointClassification(X_train, y_train)
+test_dataset = DataKeypointClassification(X_test, y_test)
+------------------------------------------------------------------------------
+batch_size = 12
+train_loader = DataLoader(train_dataset, batch_size=batch_size)
+test_loader = DataLoader(test_dataset, batch_size=batch_size)
+-------------------------------------------------------------------------------
+class NeuralNet(nn.Module):
+    def __init__(self, input_size, hidden_size, num_classes):
+        super(NeuralNet, self).__init__()
+        self.l1 = nn.Linear(input_size, hidden_size)
+        self.relu = nn.ReLU()
+        self.l2 = nn.Linear(hidden_size, num_classes)
+
+    def forward(self, x):
+        out = self.l1(x)
+        out = self.relu(out)
+        out = self.l2(out)
+        return out
+--------------------------------------------------------------------------------
+hidden_size = 256
+model = NeuralNet(X_train.shape[1], hidden_size, len(class_weights))
+--------------------------------------------------------------------------------
+len(class_weights)
+------------------------------------------------------------
+learning_rate = 0.01
+criterion = nn.CrossEntropyLoss(weight=torch.from_numpy(class_weights.astype(np.float32)))
+optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+-------------------------------------------------------------------------------------
+num_epoch = 40
+for epoch in range(num_epoch):
+    train_acc = 0
+    train_loss = 0
+    loop = tqdm(train_loader)
+    for idx, (features, labels) in enumerate(loop):
+        outputs = model(features)
+        loss = criterion(outputs, labels)
+
+        predictions = outputs.argmax(dim=1, keepdim=True).squeeze()
+        correct = (predictions == labels).sum().item()
+        accuracy = correct / batch_size
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        loop.set_description(f"Epoch [{epoch}/{num_epoch}]")
+        loop.set_postfix(loss=loss.item(), acc=accuracy)
+--------------------------------------------------------------------------------------
+test_features = torch.from_numpy(X_test.astype(np.float32))
+test_labels = y_test
+with torch.no_grad():
+    outputs = model(test_features)
+    _, predictions = torch.max(outputs, 1)
+predictions
+--------------------------------------------------------------------------------------
+print(classification_report(test_labels, predictions, target_names=encoder.classes_))
+---------------------------------------------------------------------------------------
+cm = confusion_matrix(test_labels, predictions)
+df_cm = pd.DataFrame(
+    cm,
+    index = encoder.classes_,
+    columns = encoder.classes_
+)
+df_cm
+----------------------------------------------------------------------------------------------
+import seaborn as sns
+def show_confusion_matrix(confusion_matrix):
+    hmap = sns.heatmap(confusion_matrix, annot=True, fmt="d", cmap="Blues")
+    plt.ylabel("Surface Ground Truth")
+    plt.xlabel("Predicted Surface")
+    plt.legend()
+
+show_confusion_matrix(df_cm)
+-----------------------------------------------------------------------------------------------------
+PATH_SAVE = '/content/yolov8m-pose.pt'
+torch.save(model.state_dict(), PATH_SAVE)
+----------------------------------------------------------------------------------------------
+model_inference =  NeuralNet(
+        X_train.shape[1],
+        hidden_size,
+        len(class_weights)
+    )
+
+model_inference.load_state_dict(
+        torch.load(PATH_SAVE, map_location=device)
+    )
+------------------------------------------------------------------------------------------
+feature, label = test_dataset.__getitem__(51)
+
+out = model_inference(feature)
+_, predict = torch.max(out, -1)
+print(f'\
+    prediction label : {encoder.classes_[predict]} \n\
+    ground thrut label : {encoder.classes_[label]}'
+    )
+---------------------------------------------------------------------------------------------
+encoder.classes_
+
+
+
+
+
+
+-------------------------------------------------------------------
+
+
+!pip install opencv-python
+----------------------------------
+!pip install opencv-python-headless
+------------------------------------
+!pip install ipywebrtc
+
+---------------------------------------------------------------
+
+
+
+# Code-1: Without Classification(Yoga Poses)
+
+from IPython.display import display, Javascript
+from google.colab.output import eval_js
+import cv2
+import numpy as np
+import tensorflow as tf
+import math
+import base64
+import io
+from torchvision.transforms import ToTensor
+from PIL import Image
+import torch
+import matplotlib.pyplot as plt
+
+# Load the TFLite model
+interpreter = tf.lite.Interpreter(model_path='/content/singlepose_lightning.tflite')
+interpreter.allocate_tensors()
+
+def detect(interpreter, input_tensor):
+    """Runs detection on an input image.
+
+    Args:
+      interpreter: tf.lite.Interpreter
+      input_tensor: A [1, input_height, input_width, 3] Tensor of type tf.float32.
+        input_size is specified when converting the model to TFLite.
+
+    Returns:
+      A tensor of shape [1, N, 17, 3], where N is the number of detected poses,
+      each containing keypoints and scores.
+    """
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
+
+    is_dynamic_shape_model = input_details[0]['shape_signature'][2] == -1
+    if is_dynamic_shape_model:
+        input_tensor_index = input_details[0]['index']
+        input_shape = input_tensor.shape
+        interpreter.resize_tensor_input(
+            input_tensor_index, input_shape, strict=True)
+    interpreter.allocate_tensors()
+
+    interpreter.set_tensor(input_details[0]['index'], input_tensor.numpy())
+
+    interpreter.invoke()
+
+    keypoints_with_scores = interpreter.get_tensor(output_details[0]['index'])
+    return keypoints_with_scores
+
+def draw_keypoints(frame, keypoints, confidence_threshold):
+    h, w, c = frame.shape
+    shaped = np.squeeze(np.multiply(keypoints, [h, w, 1]))
+
+    for kp in shaped:
+        ky, kx, kp_conf = kp
+        if kp_conf > confidence_threshold:
+            cv2.circle(frame, (int(kx), int(ky)), 4, (0, 255, 0), -1)
+
+def draw_connections(frame, keypoints, edges, confidence_threshold):
+    h, w, c = frame.shape
+    shaped = np.squeeze(np.multiply(keypoints, [h, w, 1]))
+
+    for edge, color in edges.items():
+        p1, p2 = edge
+        y1, x1, c1 = shaped[p1]
+        y2, x2, c2 = shaped[p2]
+
+        if (c1 > confidence_threshold) and (c2 > confidence_threshold):
+            if color == 'm':
+                line_color = (255, 0, 255)  # Magenta
+            elif color == 'c':
+                line_color = (0, 255, 255)  # Cyan
+            elif color == 'y':
+                line_color = (255, 255, 0)  # Yellow
+            else:
+                line_color = (0, 0, 255)  # Red (default)
+
+            cv2.line(frame, (int(x1), int(y1)), (int(x2), int(y2)), line_color, 2)
+
+EDGES = {
+    (0, 1): 'm',
+    (0, 2): 'c',
+    (1, 3): 'm',
+    (2, 4): 'c',
+    (0, 5): 'm',
+    (0, 6): 'c',
+    (5, 7): 'm',
+    (7, 9): 'm',
+    (6, 8): 'c',
+    (8, 10): 'c',
+    (5, 6): 'y',
+    (5, 11): 'm',
+    (6, 12): 'c',
+    (11, 12): 'y',
+    (11, 13): 'm',
+    (13, 15): 'm',
+    (12, 14): 'c',
+    (14, 16): 'c'
+}
+
+# def preprocess_image(img):
+#     img = tf.image.resize_with_pad(img, 192, 192)
+#     input_image = tf.cast(img, dtype=tf.float32)
+#     return input_image
+
+# def run_pose_estimation(frame):
+#     input_image = preprocess_image(frame)
+#     keypoints_with_scores = detect(interpreter, tf.expand_dims(input_image, axis=0))
+#     draw_connections(frame, keypoints_with_scores, EDGES, 0.4)
+#     draw_keypoints(frame, keypoints_with_scores, 0.4)
+#     return frame
+
+# def js_to_image(js_reply):
+#     image_bytes = base64.b64decode(js_reply.split(',')[1])
+#     image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+#     img = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+#     return img
+
+# def take_photo(filename='photo.jpg', quality=0.8):
+#     js = Javascript('''
+#         async function takePhoto(quality) {
+#             const div = document.createElement('div');
+#             const allow = document.createElement('button');
+#             const disable = document.createElement('button');
+#             allow.textContent = 'Allow';
+#             disable.textContent = 'Disable';
+#             div.appendChild(allow);
+#             div.appendChild(disable);
+
+#             const video = document.createElement('video');
+#             video.style.display = 'block';
+#             const stream = await navigator.mediaDevices.getUserMedia({video: true});
+
+#             document.body.appendChild(div);
+#             div.appendChild(video);
+#             video.srcObject = stream;
+#             await video.play();
+
+#             // Resize the output to fit the video element.
+#             google.colab.output.setIframeHeight(document.documentElement.scrollHeight, true);
+
+#             let isStreamOpen = true;
+
+#             allow.onclick = () => {
+#                 const canvas = document.createElement('canvas');
+#                 canvas.width = video.videoWidth;
+#                 canvas.height = video.videoHeight;
+#                 const context = canvas.getContext('2d');
+#                 setInterval(() => {
+#                     if (!isStreamOpen) return;
+#                     context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+#                     google.colab.kernel.invokeFunction('update_image', [canvas.toDataURL('image/jpeg', quality)], {});
+#                 }, 16); // Adjust the interval for smoother video capture (60 fps)
+#                 div.removeChild(allow);
+#                 div.appendChild(disable);
+#             };
+
+#             disable.onclick = () => {
+#                 isStreamOpen = false;
+#                 stream.getVideoTracks()[0].stop();
+#                 div.remove();
+#             };
+#         }
+#         ''')
+#     display(js)
+
+js_code = '''
+function initCamera() {
+    return new Promise((resolve, reject) => {
+        const video = document.createElement('video');
+        video.style.display = 'none';
+        document.body.appendChild(video);
+        const streamPromise = navigator.mediaDevices.getUserMedia({video: true});
+        streamPromise.then((stream) => {
+            video.srcObject = stream;
+            video.onloadedmetadata = () => {
+                resolve(video);
+            };
+            video.play();
+        }).catch((error) => {
+            reject(error);
+        });
+    });
+}
+
+async function takePhoto() {
+    const video = await initCamera();
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext('2d');
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const img = canvas.toDataURL('image/jpeg');
+    return img;
+}
+'''
+
+# Execute JavaScript code
+display(Javascript(js_code))
+
+# Function to convert base64 image to OpenCV format
+def js_to_image(js_reply):
+    image_bytes = base64.b64decode(js_reply.split(',')[1])
+    image_PIL = Image.open(io.BytesIO(image_bytes))
+    image_np = np.array(image_PIL)
+    frame = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+    return frame
+
+# def classify_pose(keypoints):
+#     # Define pose labels and their corresponding keypoint locations
+#     poses = {
+#         "standing": [(5, 0.9), (6, 0.9), (11, 0.9), (12, 0.9)],
+#         "sitting": [(5, 0.6), (6, 0.6), (11, 0.6), (12, 0.6), (11, 0.6), (12, 0.6), (13, 0.6), (14, 0.6)],
+#     }
+
+#     # Extract keypoint locations from the input keypoints
+#     keypoint_locations = [(kp[0], 0) if len(kp) == 1 else (kp[0], kp[1]) for kp in keypoints]
+
+#     # Compare keypoint locations with the defined poses
+#     for pose, pose_keypoints in poses.items():
+#         for kp, pk in zip(keypoint_locations, pose_keypoints):
+#           kp_array, _ = kp  # Extract the NumPy array from the tuple
+#           for i in range(len(kp_array)):  # Iterate over the keypoints
+#               x, y, _ = kp_array[i]  # Extract the x and y coordinates
+#               if math.isclose(x, pk[0], rel_tol=0.1) and math.isclose(y, pk[1], rel_tol=0.1):
+#                   return pose
+
+#     # If no matching pose is found, return "unknown"
+#     return "unknown"
+
+while True:
+    js_reply = eval_js('takePhoto()')
+    frame = js_to_image(js_reply)
+    input_image = tf.image.resize_with_pad(tf.expand_dims(frame, axis=0), 192, 192)
+    input_image = tf.cast(input_image, dtype=tf.float32)
+    keypoints_with_scores = detect(interpreter, input_image)
+    draw_connections(frame, keypoints_with_scores, EDGES, 0.4)
+    draw_keypoints(frame, keypoints_with_scores, 0.4)
+
+    # Call the classify_pose function to get the predicted pose label
+    # pose_label = classify_pose(keypoints_with_scores)
+
+    # Display the predicted pose label
+    #cv2.putText(frame, pose_label, (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+
+    plt.imshow(frame)
+    plt.axis('off')
+    plt.show()
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+# Code-2: With CSV Classification(Yoga Poses)
+Note: Dont Refer This Code!!!
+
+from IPython.display import display, Javascript
+from google.colab.output import eval_js
+import cv2
+import numpy as np
+import tensorflow as tf
+import math
+import base64
+import io
+from torchvision.transforms import ToTensor
+from PIL import Image
+import torch
+import matplotlib.pyplot as plt
+import csv
+
+# Load the TFLite model
+interpreter = tf.lite.Interpreter(model_path='/content/singlepose_lightning.tflite')
+interpreter.allocate_tensors()
+
+def detect(interpreter, input_tensor):
+    """Runs detection on an input image.
+
+    Args:
+      interpreter: tf.lite.Interpreter
+      input_tensor: A [1, input_height, input_width, 3] Tensor of type tf.float32.
+        input_size is specified when converting the model to TFLite.
+
+    Returns:
+      A tensor of shape [1, N, 17, 3], where N is the number of detected poses,
+      each containing keypoints and scores.
+    """
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
+
+    is_dynamic_shape_model = input_details[0]['shape_signature'][2] == -1
+    if is_dynamic_shape_model:
+        input_tensor_index = input_details[0]['index']
+        input_shape = input_tensor.shape
+        interpreter.resize_tensor_input(
+            input_tensor_index, input_shape, strict=True)
+    interpreter.allocate_tensors()
+
+    interpreter.set_tensor(input_details[0]['index'], input_tensor.numpy())
+
+    interpreter.invoke()
+
+    keypoints_with_scores = interpreter.get_tensor(output_details[0]['index'])
+    return keypoints_with_scores
+
+def draw_keypoints(frame, keypoints, confidence_threshold):
+    h, w, c = frame.shape
+    shaped = np.squeeze(np.multiply(keypoints, [h, w, 1]))
+
+    for kp in shaped:
+        ky, kx, kp_conf = kp
+        if kp_conf > confidence_threshold:
+            cv2.circle(frame, (int(kx), int(ky)), 4, (0, 255, 0), -1)
+
+def draw_connections(frame, keypoints, edges, confidence_threshold):
+    h, w, c = frame.shape
+    shaped = np.squeeze(np.multiply(keypoints, [h, w, 1]))
+
+    for edge, color in edges.items():
+        p1, p2 = edge
+        y1, x1, c1 = shaped[p1]
+        y2, x2, c2 = shaped[p2]
+
+        if (c1 > confidence_threshold) and (c2 > confidence_threshold):
+            if color == 'm':
+                line_color = (255, 0, 255)  # Magenta
+            elif color == 'c':
+                line_color = (0, 255, 255)  # Cyan
+            elif color == 'y':
+                line_color = (255, 255, 0)  # Yellow
+            else:
+                line_color = (0, 0, 255)  # Red (default)
+
+            cv2.line(frame, (int(x1), int(y1)), (int(x2), int(y2)), line_color, 2)
+
+EDGES = {
+    (0, 1): 'm',
+    (0, 2): 'c',
+    (1, 3): 'm',
+    (2, 4): 'c',
+    (0, 5): 'm',
+    (0, 6): 'c',
+    (5, 7): 'm',
+    (7, 9): 'm',
+    (6, 8): 'c',
+    (8, 10): 'c',
+    (5, 6): 'y',
+    (5, 11): 'm',
+    (6, 12): 'c',
+    (11, 12): 'y',
+    (11, 13): 'm',
+    (13, 15): 'm',
+    (12, 14): 'c',
+    (14, 16): 'c'
+}
+
+js_code = '''
+function initCamera() {
+    return new Promise((resolve, reject) => {
+        const video = document.createElement('video');
+        video.style.display = 'none';
+        document.body.appendChild(video);
+        const streamPromise = navigator.mediaDevices.getUserMedia({video: true});
+        streamPromise.then((stream) => {
+            video.srcObject = stream;
+            video.onloadedmetadata = () => {
+                resolve(video);
+            };
+            video.play();
+        }).catch((error) => {
+            reject(error);
+        });
+    });
+}
+
+async function takePhoto() {
+    const video = await initCamera();
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext('2d');
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const img = canvas.toDataURL('image/jpeg');
+    return img;
+}
+'''
+
+# Execute JavaScript code
+display(Javascript(js_code))
+
+# Function to convert base64 image to OpenCV format
+def js_to_image(js_reply):
+    image_bytes = base64.b64decode(js_reply.split(',')[1])
+    image_PIL = Image.open(io.BytesIO(image_bytes))
+    image_np = np.array(image_PIL)
+    frame = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+    return frame
+
+def calculate_pose_ranges_from_file(file_path):
+    pose_ranges = {}
+    with open(file_path, 'r') as file:
+        csv_reader = csv.DictReader(file)
+        for row in csv_reader:
+            label = row['label']
+            if label not in pose_ranges:
+                pose_ranges[label] = {}
+            for key, value in row.items():
+                if key.startswith(('nose', 'left_eye', 'right_eye', 'left_ear', 'right_ear',
+                                   'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow',
+                                   'left_wrist', 'right_wrist', 'left_hip', 'right_hip',
+                                   'left_knee', 'right_knee', 'left_ankle', 'right_ankle')):
+                    kp_name, coord = key.split('_')[:2]  # Extract keypoint name and coordinate (x or y)
+                    if kp_name not in pose_ranges[label]:
+                        pose_ranges[label][kp_name] = {"min_x": float('inf'), "max_x": float('-inf'),
+                                                        "min_y": float('inf'), "max_y": float('-inf')}
+                    # Convert value to float
+                    value = float(value)
+                    # Assign value to min_x, max_x, min_y, or max_y based on coordinate
+                    if coord == 'x':
+                        pose_ranges[label][kp_name]["min_x"] = min(pose_ranges[label][kp_name]["min_x"], value)
+                        pose_ranges[label][kp_name]["max_x"] = max(pose_ranges[label][kp_name]["max_x"], value)
+                    elif coord == 'y':
+                        pose_ranges[label][kp_name]["min_y"] = min(pose_ranges[label][kp_name]["min_y"], value)
+                        pose_ranges[label][kp_name]["max_y"] = max(pose_ranges[label][kp_name]["max_y"], value)
+    return pose_ranges
+
+# Example usage:
+file_path = "/content/yoga_pose_keypoint.csv"
+pose_ranges = calculate_pose_ranges_from_file(file_path)
+
+def keypoint_to_index(keypoint_name):
+    # Define a dictionary mapping keypoint names to their corresponding indices
+    keypoint_indices = {
+        "nose": 0,
+        "left_eye": 1,
+        "right_eye": 2,
+        "left_ear": 3,
+        "right_ear": 4,
+        "left_shoulder": 5,
+        "right_shoulder": 6,
+        "left_elbow": 7,
+        "right_elbow": 8,
+        "left_wrist": 9,
+        "right_wrist": 10,
+        "left_hip": 11,
+        "right_hip": 12,
+        "left_knee": 13,
+        "right_knee": 14,
+        "left_ankle": 15,
+        "right_ankle": 16
+    }
+
+    # Return the index corresponding to the keypoint name
+    return keypoint_indices.get(keypoint_name, -1)  # Return -1 if keypoint_name is not found
+
+
+def classify_pose_from_csv(keypoints_with_scores, pose_ranges, tolerance):
+    # Initialize the pose label as None
+    pose_label = None
+
+    # Iterate over each pose range
+    for label, ranges in pose_ranges.items():
+        # Assume the pose matches until proven otherwise
+        pose_matched = True
+        for keypoint, coords in ranges.items():
+            # Get the index of the keypoint
+            index = keypoint_to_index(keypoint)
+            if index == -1:
+                pose_matched = False
+                break
+
+            # Extract x, y coordinates from keypoints_with_scores
+            kp = keypoints_with_scores[index]
+            if len(kp) >= 2:
+                kp_x, kp_y = kp[:2]  # Extract only x, y coordinates
+            else:
+                pose_matched = False
+                break
+
+            # Check if keypoint x coordinate is within the range with tolerance
+            min_x = float(coords["min_x"])
+            max_x = float(coords["max_x"])
+            if not (min_x - tolerance <= kp_x <= max_x + tolerance):
+                print(f"X coordinate of {keypoint} not within range for pose {label}.")
+                pose_matched = False
+                break
+
+            # Check if keypoint y coordinate is within the range with tolerance
+            min_y = float(coords["min_y"])
+            max_y = float(coords["max_y"])
+            if not (min_y - tolerance <= kp_y <= max_y + tolerance):
+                print(f"Y coordinate of {keypoint} not within range for pose {label}.")
+                pose_matched = False
+                break
+
+        # If all keypoints are within their respective ranges, set the pose label
+        if pose_matched:
+            pose_label = label
+            break
+
+    # Return the predicted pose label
+    return pose_label
+
+# Flag to indicate whether to test on a sample image or use the webcam
+test_on_sample_image = True
+
+# Inside the loop
+while True:
+    if test_on_sample_image:
+        # Load the sample yoga image
+        image_path = "/content/yoga-poses-dataset/DATASET/TEST/downdog/00000064.jpg"
+        sample_image = cv2.imread(image_path)
+
+        # Detect keypoints in the sample image
+        input_image = tf.image.resize_with_pad(tf.expand_dims(sample_image, axis=0), 192, 192)
+        input_image = tf.cast(input_image, dtype=tf.float32)
+        keypoints_with_scores = detect(interpreter, input_image)
+
+        # Now you can directly use pose_ranges when calling classify_pose
+        pose_label = classify_pose_from_csv(keypoints_with_scores, pose_ranges, 0.2)
+
+        # Draw the predicted pose label on the sample image if pose is identified
+        if pose_label:
+            cv2.putText(sample_image, pose_label, (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+
+        # Display the sample image with keypoints and pose label
+        plt.imshow(cv2.cvtColor(sample_image, cv2.COLOR_BGR2RGB))
+        plt.axis('off')
+
+        # Display pose label below the image
+        plt.text(0, -20, f'Pose Label: {pose_label}', fontsize=12, color='red')
+
+        plt.show()
+
+        # Exit the loop after testing on the sample image
+        break
+    else:
+        js_reply = eval_js('takePhoto()')
+        frame = js_to_image(js_reply)
+        input_image = tf.image.resize_with_pad(tf.expand_dims(frame, axis=0), 192, 192)
+        input_image = tf.cast(input_image, dtype=tf.float32)
+        keypoints_with_scores = detect(interpreter, input_image)
+
+        # Now you can directly use pose_ranges when calling classify_pose
+        pose_label = classify_pose_from_csv(keypoints_with_scores, pose_ranges)
+
+        # Draw the predicted pose label on the frame if pose is identified
+        if pose_label:
+            cv2.putText(frame, pose_label, (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+
+        # Display the frame with keypoints and pose label
+        plt.imshow(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        plt.axis('off')
+
+        # Display pose label below the image
+        plt.text(0, -20, f'Pose Label: {pose_label}', fontsize=12, color='red')
+
+        plt.show()
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+
+
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+# Code-3: With Classification Functions(Yoga Poses)
+
+from IPython.display import display, Javascript
+from google.colab.output import eval_js
+import cv2
+import numpy as np
+import tensorflow as tf
+import math
+import base64
+import io
+from PIL import Image
+import matplotlib.pyplot as plt
+
+# Load the TFLite model
+interpreter = tf.lite.Interpreter(model_path='/content/singlepose_lightning.tflite')
+interpreter.allocate_tensors()
+
+# Define keypoint mapping
+KEYPOINT_MAPPING = {
+    0: "NOSE",
+    1: "LEFT_EYE",
+    2: "RIGHT_EYE",
+    3: "LEFT_EAR",
+    4: "RIGHT_EAR",
+    5: "LEFT_SHOULDER",
+    6: "RIGHT_SHOULDER",
+    7: "LEFT_ELBOW",
+    8: "RIGHT_ELBOW",
+    9: "LEFT_WRIST",
+    10: "RIGHT_WRIST",
+    11: "LEFT_HIP",
+    12: "RIGHT_HIP",
+    13: "LEFT_KNEE",
+    14: "RIGHT_KNEE",
+    15: "LEFT_ANKLE",
+    16: "RIGHT_ANKLE"
+}
+
+def detect(interpreter, input_tensor):
+    """Runs detection on an input image.
+
+    Args:
+      interpreter: tf.lite.Interpreter
+      input_tensor: A [1, input_height, input_width, 3] Tensor of type tf.float32.
+        input_size is specified when converting the model to TFLite.
+
+    Returns:
+      A tensor of shape [1, N, 17, 3], where N is the number of detected poses,
+      each containing keypoints and scores.
+    """
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
+
+    is_dynamic_shape_model = input_details[0]['shape_signature'][2] == -1
+    if is_dynamic_shape_model:
+        input_tensor_index = input_details[0]['index']
+        input_shape = input_tensor.shape
+        interpreter.resize_tensor_input(
+            input_tensor_index, input_shape, strict=True)
+    interpreter.allocate_tensors()
+
+    interpreter.set_tensor(input_details[0]['index'], input_tensor.numpy())
+
+    interpreter.invoke()
+
+    keypoints_with_scores = interpreter.get_tensor(output_details[0]['index'])
+    return keypoints_with_scores
+
+def draw_keypoints(frame, keypoints, confidence_threshold):
+    h, w, c = frame.shape
+    shaped = np.squeeze(np.multiply(keypoints, [h, w, 1]))
+
+    for kp in shaped:
+        ky, kx, kp_conf = kp
+        if kp_conf > confidence_threshold:
+            cv2.circle(frame, (int(kx), int(ky)), 4, (0, 255, 0), -1)
+
+def draw_connections(frame, keypoints, edges, confidence_threshold):
+    h, w, c = frame.shape
+    shaped = np.squeeze(np.multiply(keypoints, [h, w, 1]))
+
+    for edge, color in edges.items():
+        p1, p2 = edge
+        y1, x1, c1 = shaped[p1]
+        y2, x2, c2 = shaped[p2]
+
+        if (c1 > confidence_threshold) and (c2 > confidence_threshold):
+            if color == 'm':
+                line_color = (255, 0, 255)  # Magenta
+            elif color == 'c':
+                line_color = (0, 255, 255)  # Cyan
+            elif color == 'y':
+                line_color = (255, 255, 0)  # Yellow
+            else:
+                line_color = (0, 0, 255)  # Red (default)
+
+            cv2.line(frame, (int(x1), int(y1)), (int(x2), int(y2)), line_color, 2)
+
+EDGES = {
+    (0, 1): 'm',
+    (0, 2): 'c',
+    (1, 3): 'm',
+    (2, 4): 'c',
+    (0, 5): 'm',
+    (0, 6): 'c',
+    (5, 7): 'm',
+    (7, 9): 'm',
+    (6, 8): 'c',
+    (8, 10): 'c',
+    (5, 6): 'y',
+    (5, 11): 'm',
+    (6, 12): 'c',
+    (11, 12): 'y',
+    (11, 13): 'm',
+    (13, 15): 'm',
+    (12, 14): 'c',
+    (14, 16): 'c'
+}
+
+def js_to_image(js_reply):
+    image_bytes = base64.b64decode(js_reply.split(',')[1])
+    image_PIL = Image.open(io.BytesIO(image_bytes))
+    image_np = np.array(image_PIL)
+    frame = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+    return frame
+
+# JavaScript code to capture webcam stream
+js_code = '''
+function initCamera() {
+    return new Promise((resolve, reject) => {
+        const video = document.createElement('video');
+        video.style.display = 'none';
+        document.body.appendChild(video);
+        const streamPromise = navigator.mediaDevices.getUserMedia({video: true});
+        streamPromise.then((stream) => {
+            video.srcObject = stream;
+            video.onloadedmetadata = () => {
+                resolve(video);
+            };
+            video.play();
+        }).catch((error) => {
+            reject(error);
+        });
+    });
+}
+
+async function takePhoto() {
+    const video = await initCamera();
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    const img = canvas.toDataURL('image/jpeg');
+    return img;
+}
+'''
+
+# Execute JavaScript code
+display(Javascript(js_code))
+
+# Function to convert base64 image to OpenCV format
+def js_to_image(js_reply):
+    image_bytes = base64.b64decode(js_reply.split(',')[1])
+    image_PIL = Image.open(io.BytesIO(image_bytes))
+    image_np = np.array(image_PIL)
+    frame = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+    return frame
+
+# Function to calculate angle between three keypoints
+def calculate_angle(keypoints_with_scores, kp1, kp2, kp3):
+    x1, y1 = keypoints_with_scores[0][0][kp1][0:2]  # Extract x, y coordinates from keypoints_with_scores
+    x2, y2 = keypoints_with_scores[0][0][kp2][0:2]
+    x3, y3 = keypoints_with_scores[0][0][kp3][0:2]
+
+    # Calculate angle using the coordinates
+    angle = math.degrees(math.atan2(y3 - y2, x3 - x2) - math.atan2(y1 - y2, x1 - x2))
+
+    # Ensure angle is positive
+    if angle < 0:
+        angle += 360
+
+    return angle
+
+# Function to calculate angles for Goddess Pose
+def calculate_goddess_pose_angles(keypoints):
+    left_knee_angle = calculate_angle(keypoints, 13, 11, 15)
+    right_knee_angle = calculate_angle(keypoints, 14, 12, 16)
+    return left_knee_angle, right_knee_angle
+
+# Function to check if the pose matches the Goddess Pose criteria
+def is_goddess_pose(keypoints):
+    # Define keypoint indices for relevant body parts
+    left_hand_index = 9
+    right_hand_index = 10
+    left_shoulder_index = 5
+    right_shoulder_index = 6
+    left_hip_index = 11
+    right_hip_index = 12
+
+    # Get the coordinates of relevant keypoints
+    left_hand_x, left_hand_y = keypoints[0][0][left_hand_index][:2]
+    right_hand_x, right_hand_y = keypoints[0][0][right_hand_index][:2]
+    left_shoulder_x, left_shoulder_y = keypoints[0][0][left_shoulder_index][:2]
+    right_shoulder_x, right_shoulder_y = keypoints[0][0][right_shoulder_index][:2]
+    left_hip_x, left_hip_y = keypoints[0][0][left_hip_index][:2]
+    right_hip_x, right_hip_y = keypoints[0][0][right_hip_index][:2]
+
+    # Define thresholds for keypoint positions
+    hand_threshold = 25  # Adjust as needed
+    leg_threshold = 50  # Adjust as needed
+
+    # Check if hands are close together
+    hands_close = abs(left_hand_x - right_hand_x) < hand_threshold
+
+    # Check if legs are wide apart
+    legs_wide_apart = abs(left_hip_x - right_hip_x) > leg_threshold
+
+    # Check if body is upright (shoulders aligned with hips)
+    body_upright = abs(left_shoulder_y - left_hip_y) < hand_threshold and abs(right_shoulder_y - right_hip_y) < hand_threshold
+
+    # Check if all criteria are met for Goddess Pose
+    return hands_close and legs_wide_apart and body_upright
+
+# Function to check if the pose matches the Plank Pose criteria
+def is_plank_pose(keypoints):
+    # Define keypoint indices for relevant body parts
+    left_ankle_index = 15
+    right_ankle_index = 16
+    left_shoulder_index = 5
+    right_shoulder_index = 6
+
+    # Get the coordinates of relevant keypoints
+    left_ankle_y = keypoints[0][0][left_ankle_index][1]
+    right_ankle_y = keypoints[0][0][right_ankle_index][1]
+    left_shoulder_y = keypoints[0][0][left_shoulder_index][1]
+    right_shoulder_y = keypoints[0][0][right_shoulder_index][1]
+
+    # Define threshold for alignment
+    alignment_threshold = 50  # Adjust as needed
+
+    # Check if shoulders, hips, and ankles are aligned
+    shoulders_aligned = abs(left_shoulder_y - right_shoulder_y) < alignment_threshold
+    ankles_aligned = abs(left_ankle_y - right_ankle_y) < alignment_threshold
+
+    # Check if arms are straight
+    arms_straight = True  # Add logic to check arm straightness if needed
+
+    # Check if all criteria are met for Plank Pose
+    return shoulders_aligned and ankles_aligned and arms_straight
+
+# Function to calculate angles for Tree Pose
+def calculate_tree_pose_angles(keypoints):
+    left_hip_angle = calculate_angle(keypoints, 15, 13, 11)
+    right_hip_angle = calculate_angle(keypoints, 16, 14, 12)
+    return left_hip_angle, right_hip_angle
+
+# Function to check if the pose matches the Tree Pose criteria
+def is_tree_pose(keypoints):
+    # Define keypoint indices for relevant body parts
+    left_knee_index = 13
+    right_knee_index = 14
+    left_ankle_index = 15
+    right_ankle_index = 16
+
+    # Get the coordinates of relevant keypoints
+    left_knee_y = keypoints[0][0][left_knee_index][1]
+    right_knee_y = keypoints[0][0][right_knee_index][1]
+    left_ankle_y = keypoints[0][0][left_ankle_index][1]
+    right_ankle_y = keypoints[0][0][right_ankle_index][1]
+
+    # Define threshold for leg position
+    leg_threshold = 50  # Adjust as needed
+
+    # Check if one knee is significantly higher than the corresponding ankle
+    left_leg_up = left_knee_y < left_ankle_y - leg_threshold
+    right_leg_up = right_knee_y < right_ankle_y - leg_threshold
+
+    # Check if both arms are close to the body
+    arms_close = True  # Add logic to check arm position if needed
+
+    # Check if all criteria are met for Tree Pose
+    return left_leg_up or right_leg_up and arms_close
+
+# Function to check if the pose matches the Downward Dog Pose criteria
+def is_downward_dog_pose(keypoints):
+    # Define keypoint indices for relevant body parts
+    left_hip_index = 11
+    right_hip_index = 12
+    left_shoulder_index = 5
+    right_shoulder_index = 6
+
+    # Get the coordinates of relevant keypoints
+    left_hip_y = keypoints[0][0][left_hip_index][1]
+    right_hip_y = keypoints[0][0][right_hip_index][1]
+    left_shoulder_y = keypoints[0][0][left_shoulder_index][1]
+    right_shoulder_y = keypoints[0][0][right_shoulder_index][1]
+
+    # Define threshold for alignment
+    alignment_threshold = 50  # Adjust as needed
+
+    # Check if hips are significantly higher than shoulders
+    hips_higher = left_hip_y < left_shoulder_y - alignment_threshold and right_hip_y < right_shoulder_y - alignment_threshold
+
+    # Check if arms and legs are straight
+    arms_straight = True  # Add logic to check arm straightness if needed
+    legs_straight = True  # Add logic to check leg straightness if needed
+
+    # Check if all criteria are met for Downward Dog Pose
+    return hips_higher and arms_straight and legs_straight
+
+# Function to calculate angles for Warrior II Pose
+def calculate_warrior2_pose_angles(keypoints):
+    left_shoulder_angle = calculate_angle(keypoints, 5, 7, 9)
+    right_shoulder_angle = calculate_angle(keypoints, 6, 8, 10)
+    return left_shoulder_angle, right_shoulder_angle
+
+# Function to check if the pose matches the Warrior II Pose criteria
+def is_warrior2_pose(keypoints):
+    # Define keypoint indices for relevant body parts
+    left_hip_index = 11
+    right_hip_index = 12
+    left_shoulder_index = 5
+    right_shoulder_index = 6
+
+    # Get the coordinates of relevant keypoints
+    left_hip_y = keypoints[0][0][left_hip_index][1]
+    right_hip_y = keypoints[0][0][right_hip_index][1]
+    left_shoulder_y = keypoints[0][0][left_shoulder_index][1]
+    right_shoulder_y = keypoints[0][0][right_shoulder_index][1]
+
+    # Define threshold for alignment
+    alignment_threshold = 50  # Adjust as needed
+
+    # Check if hips are aligned with shoulders
+    hips_aligned = abs(left_hip_y - left_shoulder_y) < alignment_threshold and abs(right_hip_y - right_shoulder_y) < alignment_threshold
+
+    # Check if arms are extended out to the sides
+    arms_out = True  # Add logic to check arm position if needed
+
+    # Check if legs are wide apart
+    legs_wide = True  # Add logic to check leg position if needed
+
+    # Check if all criteria are met for Warrior II Pose
+    return hips_aligned and arms_out and legs_wide
+
+# Function to perform pose estimation and validation
+def run_pose_estimation(frame, keypoints):
+    left_knee_angle, right_knee_angle = calculate_goddess_pose_angles(keypoints)
+    left_hip_angle, right_hip_angle = calculate_tree_pose_angles(keypoints)
+    left_shoulder_angle, right_shoulder_angle = calculate_warrior2_pose_angles(keypoints)
+
+    if is_goddess_pose(keypoints):
+        return 'Goddess Pose'
+    elif is_plank_pose(keypoints):
+        return 'Plank Pose'
+    elif is_tree_pose(keypoints):
+        return 'Tree Pose'
+    elif is_downward_dog_pose(keypoints):
+        return 'Downward Dog Pose'
+    elif is_warrior2_pose(keypoints):
+        return 'Warrior II Pose'
+    else:
+        return 'Unknown Pose'
+
+# Function to display pose estimation result
+def display_pose_estimation(frame):
+    plt.imshow(frame)
+    plt.axis('off')
+    plt.show()
+
+# Modify the main loop to use a higher confidence threshold
+while True:
+    js_reply = eval_js('takePhoto()')
+    frame = js_to_image(js_reply)
+    input_image = tf.image.resize_with_pad(tf.expand_dims(frame, axis=0), 192, 192)
+    input_image = tf.cast(input_image, dtype=tf.float32)
+    keypoints_with_scores = detect(interpreter, input_image)
+    draw_connections(frame, keypoints_with_scores, EDGES, 0.4)
+    draw_keypoints(frame, keypoints_with_scores, 0.6)  # Adjust confidence threshold here
+    goddess_angles, plank_alignment, tree_angles, downward_dog, warrior2_angles = calculate_pose_angles(keypoints_with_scores)
+    # print("Goddess Pose Angles:", goddess_angles)
+    # print("Plank Pose Alignment:", plank_alignment)
+    # print("Tree Pose Angles:", tree_angles)
+    # print("Downward Dog Pose:", downward_dog)
+    # print("Warrior II Pose Angles:", warrior2_angles)
+    display_pose_estimation(frame)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
